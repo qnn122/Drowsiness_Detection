@@ -44,6 +44,7 @@ triggerconfig(vid, 'Manual');
 % Create figure
 h_fig = figure('name', 'Drowsiness Detection Tool');
 set(h_fig,'doublebuffer','on');
+set(h_fig,'CloseRequestFcn', @CloseReq);
 
 % Create 2 axes to contain video feed
 ax1 = axes('Parent', h_fig,...
@@ -393,6 +394,22 @@ t = timer('TimerFcn', {@DetectDrowsiness, checkbox, popup}, ...
     drawnow;
     end % DetecDrowsiness() sub-function
 
+
+% ---------------------------------------------------------------
+% Figure Closing Request
+    function CloseReq(hobj, event)
+        selection = questdlg('Close this Figure?', ...
+            'Close Request Function', ...
+            'Yes', 'No', 'Yes');
+        switch selection,
+            case 'Yes',
+                %stop(t); delete(t);
+                stop(vid); delete(vid);
+                delete(gcf);
+            case 'No'
+            return
+        end
+    end
 % ---------------------------------------------------------------
 % CallBack of START BUTTON: start image aquisition
     function startbCallback(hobj, event)
