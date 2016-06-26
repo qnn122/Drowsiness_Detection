@@ -1,0 +1,365 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      --><title>Demo illustrating the fine_threshold option of the FastHaarAdaboost</title><meta name="generator" content="MATLAB 7.9"><meta name="date" content="2011-02-15"><meta name="m-file" content="test_thresh"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Demo illustrating the fine_threshold option of the FastHaarAdaboost</h1><!--introduction--><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">training algorithm (see fast_haar_adaboost_binary_train_cascade.c and</a></li><li><a href="#2">fast_haar_ada_weaklearner.c)</a></li></ul></div><h2>training algorithm (see fast_haar_adaboost_binary_train_cascade.c and<a name="1"></a></h2><h2>fast_haar_ada_weaklearner.c)<a name="2"></a></h2><pre class="codeinput">p1 = 0.5;
+p2 = 0.5;
+
+m1 = 2;
+m2 = 3;
+
+s1 = (2.5)^2;
+s2 = (2)^2;
+
+
+<span class="keyword">if</span>(m1 &gt; m2)
+    d  = (m1 - m2)/sqrt((s1 + s2)/2);
+<span class="keyword">else</span>
+    d  = (m2 - m1)/sqrt((s1 + s2)/2);
+<span class="keyword">end</span>
+
+method = 2;
+
+<span class="keyword">if</span>(method == 1)
+
+    a1     = p1./sqrt(2*pi*s1);
+    a2     = p2./sqrt(2*pi*s2);
+
+    invs1  = 1./s1;
+    invs2  = 1./s2;
+
+    temp1  = m1.*invs1;
+    temp2  = m2.*invs2;
+
+    A      = (m1.* temp1) - (m2.* temp2);
+    B      = -2*(temp1 - temp2);
+    C      = invs1 - invs2 + 2*(log(a2/a1));
+    delta  = B.*B - 4*A.*C;
+
+    <span class="keyword">if</span>(delta &lt; 0)
+        delta = -delta;
+    <span class="keyword">end</span>
+
+    sqrtdelta   = sqrt(delta);
+
+    <span class="keyword">if</span>(A ~= 0)
+
+        x1      = (-B + sqrtdelta)./(2*A);
+        x2      = (-B - sqrtdelta)./(2*A);
+
+    <span class="keyword">else</span>
+
+        x1      = -B/(2*A);
+        x2      = x1;
+
+    <span class="keyword">end</span>
+
+<span class="keyword">else</span>
+
+
+    cte     = p1/p2;
+    alpha   = s1 - s2;
+    <span class="comment">%beta    = 2*(m1.*s2 - m2.*s1);</span>
+    beta    = (m1.*s2 - m2.*s1);
+
+    gamma   = (m2*m2).*s1 - (m1*m1).*s2   +  2*s1*s2.*log(cte.*(s2/s1));<span class="comment">% 2*s1*2*s2.*log(cte.*sqrt(s2/s1)) = 2*s1*s2.*log(cte.*(s2/s1))</span>
+
+    <span class="comment">%    delta   = beta.*beta - 4*alpha.*gamma;</span>
+
+    delta   = beta.*beta - alpha.*gamma;
+
+
+    <span class="keyword">if</span>(delta &lt; 0)
+        delta = -delta;
+    <span class="keyword">end</span>
+
+    sqrtdelta = sqrt(delta);
+
+    <span class="keyword">if</span>(alpha ~= 0)
+        x1      = (-beta + sqrtdelta)./(alpha);
+        x2      = (-beta - sqrtdelta)./(alpha);
+    <span class="keyword">else</span>
+        x1      = -gamma/beta;
+        T       = (m1 + m2)/2 + (sqrt(s1)/(m1 - m2))*log(cte);
+        x2      = x1;
+    <span class="keyword">end</span>
+<span class="keyword">end</span>
+
+sqrts1  = 1/sqrt(s1);
+sqrts2  = 1/sqrt(s2);
+
+x               = (-50:0.005:50);
+
+cost_fcn        = @(y,p1,p2,m1,m2,sqrts1,sqrts2) (0.5 * (1 + p1*(erf((y-m1)*sqrts1))  - p2*(erf((y-m2)*sqrts2))   ));
+
+
+<span class="keyword">if</span>(m1 &gt; m2)
+    Err         = cost_fcn(x,p1,p2,m1,m2,sqrts1,sqrts2);
+    dErr        = sqrt(1/pi).*(p1*exp(-(((x-m1).^2)./s1))/sqrts1 - p2*exp(-(((x-m2).^2)./s2))/sqrts2);
+    Errx1       = cost_fcn(x1,p1,p2,m1,m2,sqrts1,sqrts2);
+    Errx2       = cost_fcn(x2,p1,p2,m1,m2,sqrts1,sqrts2);
+<span class="keyword">else</span>
+    Err         = cost_fcn(x,p2,p1,m2,m1,sqrts2,sqrts1);
+    dErr        = sqrt(1/pi).*(p2*exp(-(((x-m2).^2)./s2))/sqrts2 - p1*exp(-(((x-m1).^2)./s1))/sqrts1);
+    Errx1       = cost_fcn(x1,p2,p1,m2,m1,sqrts2,sqrts1);
+    Errx2       = cost_fcn(x2,p2,p1,m2,m1,sqrts2,sqrts1);
+<span class="keyword">end</span>
+
+<span class="keyword">if</span>(m1 &gt; m2)
+    Errx                                       = cost_fcn(x1,p1,p2,m1,m2,sqrts1,sqrts2);
+    [xnew , Errxnew , func_evals ]             = neldermead_error_fcn(cost_fcn,x1,p1,p2,m1,m2,sqrts1,sqrts2);
+<span class="keyword">else</span>
+    Errx                                       = cost_fcn(x2,p2,p1,m2,m1,sqrts2,sqrts1);
+    [xnew , Errxnew , func_evals ]             = neldermead_error_fcn(cost_fcn,x2,p2,p1,m2,m1,sqrts2,sqrts1);
+<span class="keyword">end</span>
+
+dErr1           = diff(Err);
+
+[Errx , Errxnew]
+
+<span class="keyword">if</span>(method == 1)
+    figure(1)
+    plot(x , p1*normpdf(x , m1 , 1/sqrts1) , x , p2*normpdf(x , m2 , 1/sqrts2) , <span class="string">'r'</span> , x , Err , <span class="string">'k'</span> , x , dErr , <span class="string">'c'</span> , x1 , Errx1 , <span class="string">'g*'</span> , x2 , Errx2 , <span class="string">'m^'</span> ,  xnew , Errxnew , <span class="string">'rp'</span> )
+    title(sprintf(<span class="string">'Method 1, p1=%2.1f, p2=%2.1f, m1=%2.1f, m2=%2.1f, \\sigma1=%2.1f, \\sigma2=%2.1f'</span> , p1,p2,m1,m2,sqrt(s1),sqrt(s2)))
+
+    legend(<span class="string">'p1'</span>,<span class="string">'p2'</span>,<span class="string">'E(\theta)'</span>)
+<span class="keyword">else</span>
+
+    figure(2)
+    plot(x , p1*normpdf(x , m1 , 1/sqrts1) , x , p2*normpdf(x , m2 , 1/sqrts2) , <span class="string">'r'</span> , x , Err , <span class="string">'k'</span>, x , dErr , <span class="string">'c'</span> , x1 , Errx1 , <span class="string">'g*'</span> , x2 , Errx2 , <span class="string">'m^'</span> ,  xnew , Errxnew , <span class="string">'rp'</span>)
+    title(sprintf(<span class="string">'Method 2, p1=%2.1f, p2=%2.1f, m1=%2.1f, m2=%2.1f, \\sigma1=%2.1f, \\sigma2=%2.1f'</span> , p1,p2,m1,m2,sqrts1,sqrts2))
+    legend(<span class="string">'p1'</span>,<span class="string">'p2'</span>,<span class="string">'E(\theta)'</span>)
+
+
+
+    figure(2)
+    plot(x , p1*normpdf(x , m1 , 1/sqrts1) , x , p2*normpdf(x , m2 , 1/sqrts2) , <span class="string">'r'</span> , x , Err , <span class="string">'k'</span>, x , dErr , <span class="string">'c'</span> , x , [0 , dErr1] , <span class="string">'y'</span>, x1 , Errx1 , <span class="string">'g*'</span> , x2 , Errx2 , <span class="string">'m^'</span> ,  xnew , Errxnew , <span class="string">'rp'</span>)
+    title(sprintf(<span class="string">'Method 2, p1=%2.1f, p2=%2.1f, m1=%2.1f, m2=%2.1f, \\sigma1=%2.1f, \\sigma2=%2.1f'</span> , p1,p2,m1,m2,sqrts1,sqrts2))
+    legend(<span class="string">'p1'</span>,<span class="string">'p2'</span>,<span class="string">'E(\theta)'</span>)
+
+
+<span class="keyword">end</span>
+
+axis([min(x)-0.5 , max(x)+0.5 , -0.6 , 0.6])
+</pre><pre class="codeoutput">
+ans =
+
+    0.3999    0.3698
+
+</pre><img vspace="5" hspace="5" src="test_thresh_01.png" alt=""> <p class="footer"><br>
+      Published with MATLAB&reg; 7.9<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Demo illustrating the fine_threshold option of the FastHaarAdaboost
+%% training algorithm (see fast_haar_adaboost_binary_train_cascade.c and 
+%% fast_haar_ada_weaklearner.c)
+
+
+
+
+p1 = 0.5;
+p2 = 0.5;
+
+m1 = 2;
+m2 = 3;
+
+s1 = (2.5)^2;
+s2 = (2)^2;
+
+
+if(m1 > m2)
+    d  = (m1 - m2)/sqrt((s1 + s2)/2);
+else
+    d  = (m2 - m1)/sqrt((s1 + s2)/2);
+end
+
+method = 2;
+
+if(method == 1)
+    
+    a1     = p1./sqrt(2*pi*s1);
+    a2     = p2./sqrt(2*pi*s2);
+    
+    invs1  = 1./s1;
+    invs2  = 1./s2;
+    
+    temp1  = m1.*invs1;
+    temp2  = m2.*invs2;
+    
+    A      = (m1.* temp1) - (m2.* temp2);
+    B      = -2*(temp1 - temp2);
+    C      = invs1 - invs2 + 2*(log(a2/a1));
+    delta  = B.*B - 4*A.*C;
+    
+    if(delta < 0)
+        delta = -delta;
+    end
+    
+    sqrtdelta   = sqrt(delta);
+    
+    if(A ~= 0)
+        
+        x1      = (-B + sqrtdelta)./(2*A);
+        x2      = (-B - sqrtdelta)./(2*A);
+        
+    else
+        
+        x1      = -B/(2*A);
+        x2      = x1;
+        
+    end
+    
+else
+    
+    
+    cte     = p1/p2;
+    alpha   = s1 - s2;
+    %beta    = 2*(m1.*s2 - m2.*s1);
+    beta    = (m1.*s2 - m2.*s1);
+    
+    gamma   = (m2*m2).*s1 - (m1*m1).*s2   +  2*s1*s2.*log(cte.*(s2/s1));% 2*s1*2*s2.*log(cte.*sqrt(s2/s1)) = 2*s1*s2.*log(cte.*(s2/s1))
+    
+    %    delta   = beta.*beta - 4*alpha.*gamma;
+    
+    delta   = beta.*beta - alpha.*gamma;
+    
+    
+    if(delta < 0)
+        delta = -delta;
+    end
+    
+    sqrtdelta = sqrt(delta);
+    
+    if(alpha ~= 0)
+        x1      = (-beta + sqrtdelta)./(alpha);
+        x2      = (-beta - sqrtdelta)./(alpha);
+    else
+        x1      = -gamma/beta;
+        T       = (m1 + m2)/2 + (sqrt(s1)/(m1 - m2))*log(cte);
+        x2      = x1;
+    end
+end
+
+sqrts1  = 1/sqrt(s1);
+sqrts2  = 1/sqrt(s2);
+
+x               = (-50:0.005:50);
+
+cost_fcn        = @(y,p1,p2,m1,m2,sqrts1,sqrts2) (0.5 * (1 + p1*(erf((y-m1)*sqrts1))  - p2*(erf((y-m2)*sqrts2))   ));
+
+
+if(m1 > m2)
+    Err         = cost_fcn(x,p1,p2,m1,m2,sqrts1,sqrts2);    
+    dErr        = sqrt(1/pi).*(p1*exp(-(((x-m1).^2)./s1))/sqrts1 - p2*exp(-(((x-m2).^2)./s2))/sqrts2);
+    Errx1       = cost_fcn(x1,p1,p2,m1,m2,sqrts1,sqrts2);
+    Errx2       = cost_fcn(x2,p1,p2,m1,m2,sqrts1,sqrts2);    
+else
+    Err         = cost_fcn(x,p2,p1,m2,m1,sqrts2,sqrts1);
+    dErr        = sqrt(1/pi).*(p2*exp(-(((x-m2).^2)./s2))/sqrts2 - p1*exp(-(((x-m1).^2)./s1))/sqrts1);
+    Errx1       = cost_fcn(x1,p2,p1,m2,m1,sqrts2,sqrts1);
+    Errx2       = cost_fcn(x2,p2,p1,m2,m1,sqrts2,sqrts1);   
+end
+
+if(m1 > m2)
+    Errx                                       = cost_fcn(x1,p1,p2,m1,m2,sqrts1,sqrts2);
+    [xnew , Errxnew , func_evals ]             = neldermead_error_fcn(cost_fcn,x1,p1,p2,m1,m2,sqrts1,sqrts2);
+else
+    Errx                                       = cost_fcn(x2,p2,p1,m2,m1,sqrts2,sqrts1);
+    [xnew , Errxnew , func_evals ]             = neldermead_error_fcn(cost_fcn,x2,p2,p1,m2,m1,sqrts2,sqrts1);
+end
+
+dErr1           = diff(Err);
+
+[Errx , Errxnew]
+
+if(method == 1)
+    figure(1)
+    plot(x , p1*normpdf(x , m1 , 1/sqrts1) , x , p2*normpdf(x , m2 , 1/sqrts2) , 'r' , x , Err , 'k' , x , dErr , 'c' , x1 , Errx1 , 'g*' , x2 , Errx2 , 'm^' ,  xnew , Errxnew , 'rp' )
+    title(sprintf('Method 1, p1=%2.1f, p2=%2.1f, m1=%2.1f, m2=%2.1f, \\sigma1=%2.1f, \\sigma2=%2.1f' , p1,p2,m1,m2,sqrt(s1),sqrt(s2)))
+    
+    legend('p1','p2','E(\theta)')
+else
+    
+    figure(2)
+    plot(x , p1*normpdf(x , m1 , 1/sqrts1) , x , p2*normpdf(x , m2 , 1/sqrts2) , 'r' , x , Err , 'k', x , dErr , 'c' , x1 , Errx1 , 'g*' , x2 , Errx2 , 'm^' ,  xnew , Errxnew , 'rp')
+    title(sprintf('Method 2, p1=%2.1f, p2=%2.1f, m1=%2.1f, m2=%2.1f, \\sigma1=%2.1f, \\sigma2=%2.1f' , p1,p2,m1,m2,sqrts1,sqrts2))
+    legend('p1','p2','E(\theta)')
+    
+    
+    
+    figure(2)
+    plot(x , p1*normpdf(x , m1 , 1/sqrts1) , x , p2*normpdf(x , m2 , 1/sqrts2) , 'r' , x , Err , 'k', x , dErr , 'c' , x , [0 , dErr1] , 'y', x1 , Errx1 , 'g*' , x2 , Errx2 , 'm^' ,  xnew , Errxnew , 'rp')
+    title(sprintf('Method 2, p1=%2.1f, p2=%2.1f, m1=%2.1f, m2=%2.1f, \\sigma1=%2.1f, \\sigma2=%2.1f' , p1,p2,m1,m2,sqrts1,sqrts2))
+    legend('p1','p2','E(\theta)')
+    
+    
+end
+
+axis([min(x)-0.5 , max(x)+0.5 , -0.6 , 0.6])
+
+
+
+
+
+
+##### SOURCE END #####
+--></body></html>
